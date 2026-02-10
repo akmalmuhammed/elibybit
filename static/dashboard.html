@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eli Bot — Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #000000;
+  --surface: rgba(255,255,255,0.04);
+  --surface-hover: rgba(255,255,255,0.07);
+  --surface-active: rgba(255,255,255,0.10);
+  --border: rgba(255,255,255,0.08);
+  --text: #F5F5F7;
+  --text-secondary: #8E8E93;
+  --text-tertiary: #636366;
+  --green: #30D158;
+  --red: #FF453A;
+  --blue: #0A84FF;
+  --orange: #FF9F0A;
+  --yellow: #FFD60A;
+  --purple: #BF5AF2;
+  --teal: #64D2FF;
+  --green-bg: rgba(48,209,88,0.12);
+  --red-bg: rgba(255,69,58,0.12);
+  --blue-bg: rgba(10,132,255,0.12);
+  --orange-bg: rgba(255,159,10,0.12);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Layout ─── */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+/* ─── Header ─── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 28px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--text) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.mode-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 20px;
+}
+.mode-dry { background: var(--blue-bg); color: var(--blue); }
+.mode-live { background: var(--red-bg); color: var(--red); }
+.header-right { display: flex; align-items: center; gap: 16px; }
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.status-dot.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.status-dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+.uptime { color: var(--text-secondary); font-size: 13px; font-family: var(--mono); }
+
+/* ─── Metric Cards ─── */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: background 0.2s;
+}
+.metric-card:hover { background: var(--surface-hover); }
+.metric-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: -1px;
+}
+.metric-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-family: var(--mono);
+}
+.positive { color: var(--green); }
+.negative { color: var(--red); }
+.neutral { color: var(--text); }
+
+/* ─── Section ─── */
+.section {
+  margin-bottom: 24px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title .count {
+  background: var(--surface-active);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+/* ─── Coins Grid ─── */
+.coins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 8px;
+}
+.coin-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  transition: all 0.2s;
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.coin-card:hover { background: var(--surface-hover); transform: translateY(-1px); }
+.coin-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.coin-card.bull::before { background: var(--green); }
+.coin-card.bear::before { background: var(--red); }
+.coin-symbol {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--mono);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.coin-direction {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+.coin-direction.bull { background: var(--green-bg); color: var(--green); }
+.coin-direction.bear { background: var(--red-bg); color: var(--red); }
+.coin-price {
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.coin-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+}
+.coin-badge {
+  position: absolute;
+  top: 8px; right: 8px;
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.coin-badge.cooldown { background: var(--orange-bg); color: var(--orange); }
+.coin-badge.trading { background: var(--blue-bg); color: var(--blue); }
+
+/* ─── Two Column Layout ─── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* ─── Slots Grid ─── */
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.slot-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  transition: background 0.2s;
+}
+.slot-card:hover { background: var(--surface-hover); }
+.slot-card.in-trade { border-color: var(--blue); border-style: solid; }
+.slot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.slot-id {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  font-family: var(--mono);
+}
+.slot-state {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+.slot-state.available { background: var(--green-bg); color: var(--green); }
+.slot-state.in_trade { background: var(--blue-bg); color: var(--blue); }
+.slot-state.cooldown { background: var(--orange-bg); color: var(--orange); }
+.slot-state.frozen { background: var(--red-bg); color: var(--red); }
+.slot-balance {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: -0.5px;
+}
+.slot-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+  margin-top: 4px;
+}
+
+/* ─── Signals / Trades Table ─── */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.table-inner {
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.table-inner::-webkit-scrollbar { width: 6px; }
+.table-inner::-webkit-scrollbar-track { background: transparent; }
+.table-inner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 14px;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  background: rgba(28,28,30,0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-family: var(--mono);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+tr:hover td { background: rgba(255,255,255,0.02); }
+.action-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+.action-badge.dry_run { background: var(--blue-bg); color: var(--blue); }
+.action-badge.executed { background: var(--green-bg); color: var(--green); }
+.action-badge.skipped { background: rgba(255,255,255,0.06); color: var(--text-tertiary); }
+
+/* ─── Kill Switch Bar ─── */
+.killswitch-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.killswitch-bar.triggered {
+  border-color: var(--red);
+  background: var(--red-bg);
+}
+.ks-left { display: flex; align-items: center; gap: 12px; }
+.ks-label { font-size: 13px; font-weight: 600; }
+.ks-sub { font-size: 12px; color: var(--text-secondary); }
+.balance-bar-wrap {
+  flex: 1;
+  max-width: 400px;
+  margin: 0 24px;
+}
+.balance-bar-bg {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.balance-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease, background 0.3s;
+}
+.balance-bar-fill.healthy { background: var(--green); }
+.balance-bar-fill.warning { background: var(--orange); }
+.balance-bar-fill.danger { background: var(--red); }
+.balance-bar-threshold {
+  position: absolute;
+  height: 100%;
+  width: 2px;
+  background: var(--red);
+  top: 0;
+  opacity: 0.6;
+}
+
+/* ─── Log Viewer ─── */
+.log-viewer {
+  background: #0D0D0D;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-height: 280px;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.log-viewer::-webkit-scrollbar { width: 6px; }
+.log-viewer::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line .ts { color: var(--text-tertiary); }
+.log-line .info { color: var(--blue); }
+.log-line .warn { color: var(--orange); }
+.log-line .err { color: var(--red); }
+.log-line .signal { color: var(--yellow); }
+.log-line .ha { color: var(--green); }
+
+/* ─── Empty State ─── */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.empty-state .icon { font-size: 32px; margin-bottom: 12px; opacity: 0.5; }
+
+/* ─── Active Trades ─── */
+.trades-active {
+  margin-bottom: 24px;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 1024px) {
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+  .coins-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .slots-grid { grid-template-columns: repeat(2, 1fr); }
+  .two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .container { padding: 16px 12px; }
+  .metrics { grid-template-columns: 1fr 1fr; }
+  .header { flex-direction: column; gap: 12px; align-items: flex-start; }
+  .balance-bar-wrap { display: none; }
+}
+
+/* ─── Pulse Animation ─── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse { animation: pulse 2s ease-in-out infinite; }
+
+/* ─── Fade in ─── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+</style>
+</head>
+<body>
+
+<div class="container" id="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <span class="logo">Eli Bot</span>
+      <span class="mode-badge" id="modeBadge">—</span>
+    </div>
+    <div class="header-right">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="uptime" id="uptime">—</span>
+      <span style="color:var(--text-tertiary);font-size:12px" id="lastUpdate">—</span>
+    </div>
+  </div>
+
+  <!-- Kill Switch Bar -->
+  <div class="killswitch-bar" id="ksBar">
+    <div class="ks-left">
+      <span style="font-size:18px" id="ksIcon">🛡️</span>
+      <div>
+        <div class="ks-label" id="ksLabel">Kill Switch Active</div>
+        <div class="ks-sub" id="ksSub">—</div>
+      </div>
+    </div>
+    <div class="balance-bar-wrap">
+      <div class="balance-bar-bg">
+        <div class="balance-bar-fill" id="balFill"></div>
+        <div class="balance-bar-threshold" id="balThreshold"></div>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-family:var(--mono);font-size:18px;font-weight:700" id="balValue">—</div>
+      <div style="font-size:11px;color:var(--text-tertiary)">/ <span id="balInit">$80</span></div>
+    </div>
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-label">Total Balance</div>
+      <div class="metric-value" id="mBal">—</div>
+      <div class="metric-sub" id="mBalPnl">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Unrealized P&L</div>
+      <div class="metric-value" id="mUPnl">$0.00</div>
+      <div class="metric-sub" id="mUPnlTrades">0 open trades</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Slots Available</div>
+      <div class="metric-value" id="mSlots">—</div>
+      <div class="metric-sub" id="mSlotsSub">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Signals Today</div>
+      <div class="metric-value" id="mSignals">0</div>
+      <div class="metric-sub" id="mSignalsSub">—</div>
+    </div>
+  </div>
+
+  <!-- Coins Grid -->
+  <div class="section">
+    <div class="section-title">
+      Tracked Coins <span class="count" id="coinCount">0</span>
+    </div>
+    <div class="coins-grid" id="coinsGrid"></div>
+  </div>
+
+  <!-- Two Column: Slots + Active Trades -->
+  <div class="two-col">
+    <div class="section">
+      <div class="section-title">Slots</div>
+      <div class="slots-grid" id="slotsGrid"></div>
+    </div>
+    <div class="section trades-active">
+      <div class="section-title">Active Trades <span class="count" id="tradeCount">0</span></div>
+      <div class="table-wrap">
+        <div class="table-inner">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Entry</th>
+                <th>Current</th>
+                <th>SL</th>
+                <th>TP</th>
+                <th>uP&L</th>
+              </tr>
+            </thead>
+            <tbody id="activeTrades"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="noTrades">
+          <div class="icon">📊</div>
+          <div>No active trades</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two Column: Signals + Trade History -->
+  <div class="two-col">
+    <div class="section">
+      <div class="section-title">Signal Log <span class="count" id="sigCount">0</span></div>
+      <div class="table-wrap">
+        <div class="table-inner">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Dir</th>
+                <th>Price</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="signalLog"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="noSignals">
+          <div class="icon">📡</div>
+          <div>Waiting for signals...</div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">Live Logs</div>
+      <div class="log-viewer" id="logViewer">
+        <div class="empty-state" style="padding:20px">
+          <div class="icon">📋</div>
+          <div>Loading logs...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function formatPrice(price, symbol = '') {
+  if (!price || price === 0) return '—';
+  if (price >= 1000) return '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  if (price >= 1) return '$' + price.toFixed(4);
+  if (price >= 0.001) return '$' + price.toFixed(6);
+  return '$' + price.toFixed(8);
+}
+
+function formatPnl(pnl) {
+  const prefix = pnl >= 0 ? '+' : '';
+  return prefix + '$' + pnl.toFixed(4);
+}
+
+function pnlClass(pnl) {
+  if (pnl > 0) return 'positive';
+  if (pnl < 0) return 'negative';
+  return 'neutral';
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr + 'Z');
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function actionBadge(action) {
+  const cls = action.startsWith('SKIPPED') ? 'skipped' :
+              action === 'DRY_RUN' ? 'dry_run' :
+              action === 'EXECUTED' ? 'executed' : 'skipped';
+  const label = action.replace('SKIPPED_', '').replace('_', ' ');
+  return `<span class="action-badge ${cls}">${label}</span>`;
+}
+
+function colorizeLog(line) {
+  let cls = '';
+  if (line.includes('ERROR') || line.includes('CRITICAL')) cls = 'err';
+  else if (line.includes('WARNING')) cls = 'warn';
+  else if (line.includes('[SIGNAL]') || line.includes('[DRY RUN]')) cls = 'signal';
+  else if (line.includes('[HA]')) cls = 'ha';
+  else if (line.includes('INFO')) cls = 'info';
+  // Highlight timestamp
+  const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+  if (tsMatch) {
+    const rest = line.slice(tsMatch[1].length);
+    return `<span class="ts">${tsMatch[1]}</span><span class="${cls}">${escapeHtml(rest)}</span>`;
+  }
+  return `<span class="${cls}">${escapeHtml(line)}</span>`;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Main Update Loop ───
+let refreshInterval = 3000;
+let logRefreshInterval = 5000;
+
+async function fetchDashboard() {
+  try {
+    const res = await fetch('/api/dashboard');
+    if (!res.ok) throw new Error('API error');
+    const d = await res.json();
+    render(d);
+    $('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB');
+  } catch (e) {
+    $('statusDot').className = 'status-dot red';
+    $('lastUpdate').textContent = 'Connection lost';
+  }
+}
+
+async function fetchLogs() {
+  try {
+    const res = await fetch('/api/logs?n=40');
+    const d = await res.json();
+    if (d.lines && d.lines.length > 0) {
+      $('logViewer').innerHTML = d.lines.map(l =>
+        `<div class="log-line">${colorizeLog(l)}</div>`
+      ).join('');
+      $('logViewer').scrollTop = $('logViewer').scrollHeight;
+    }
+  } catch (e) {}
+}
+
+function render(d) {
+  const o = d.overview;
+
+  // Mode badge
+  const mb = $('modeBadge');
+  mb.textContent = o.mode;
+  mb.className = 'mode-badge ' + (o.mode === 'LIVE' ? 'mode-live' : 'mode-dry');
+
+  // Status dot
+  const dot = $('statusDot');
+  if (o.last_data_seconds_ago > 120) {
+    dot.className = 'status-dot red';
+  } else if (o.last_data_seconds_ago > 30) {
+    dot.className = 'status-dot orange';
+  } else {
+    dot.className = 'status-dot green';
+  }
+
+  // Uptime
+  $('uptime').textContent = formatUptime(o.uptime_seconds);
+
+  // Kill switch bar
+  const ksBar = $('ksBar');
+  if (o.kill_switch_triggered) {
+    ksBar.className = 'killswitch-bar triggered';
+    $('ksIcon').textContent = '🚨';
+    $('ksLabel').textContent = 'KILL SWITCH TRIGGERED';
+    $('ksSub').textContent = 'All positions closed. Manual intervention required.';
+  } else {
+    ksBar.className = 'killswitch-bar';
+    $('ksIcon').textContent = '🛡️';
+    $('ksLabel').textContent = 'Kill Switch Active';
+    $('ksSub').textContent = `Triggers below $${o.kill_switch_threshold.toFixed(0)} total balance`;
+  }
+
+  // Balance bar
+  const pct = Math.min(100, (o.total_balance / o.initial_balance) * 100);
+  const thresholdPct = (o.kill_switch_threshold / o.initial_balance) * 100;
+  const fill = $('balFill');
+  fill.style.width = pct + '%';
+  fill.className = 'balance-bar-fill ' + (pct > 60 ? 'healthy' : pct > 40 ? 'warning' : 'danger');
+  $('balThreshold').style.left = thresholdPct + '%';
+  $('balValue').textContent = '$' + o.total_balance.toFixed(2);
+  $('balInit').textContent = '$' + o.initial_balance.toFixed(0);
+
+  // Metric cards
+  $('mBal').textContent = '$' + o.total_balance.toFixed(2);
+  $('mBal').className = 'metric-value';
+  const pnl = o.total_pnl;
+  $('mBalPnl').textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + ' total P&L';
+  $('mBalPnl').className = 'metric-sub ' + pnlClass(pnl);
+
+  // Unrealized P&L
+  const uPnl = d.active_trades.reduce((sum, t) => sum + (t.unrealized_pnl || 0), 0);
+  $('mUPnl').textContent = formatPnl(uPnl);
+  $('mUPnl').className = 'metric-value ' + pnlClass(uPnl);
+  $('mUPnlTrades').textContent = d.active_trades.length + ' open trade' + (d.active_trades.length !== 1 ? 's' : '');
+
+  // Slots
+  const avail = d.slots.filter(s => s.state === 'AVAILABLE').length;
+  const inTrade = d.slots.filter(s => s.state === 'IN_TRADE').length;
+  $('mSlots').textContent = avail + '/' + d.slots.length;
+  $('mSlotsSub').textContent = inTrade + ' in trade, ' + (d.slots.length - avail - inTrade) + ' other';
+
+  // Signals count
+  $('mSignals').textContent = d.signals.length;
+  $('mSignalsSub').textContent = d.signals.length > 0 ? 'Latest: ' + d.signals[0].symbol : 'No signals yet';
+
+  // Coins grid
+  $('coinCount').textContent = d.coins.length;
+  $('coinsGrid').innerHTML = d.coins.map(c => `
+    <div class="coin-card ${c.ha_direction.toLowerCase()} fade-in">
+      ${c.in_cooldown ? '<span class="coin-badge cooldown">COOLDOWN</span>' : ''}
+      ${c.in_trade ? '<span class="coin-badge trading">TRADING</span>' : ''}
+      <div class="coin-symbol">
+        <span>${c.symbol.replace('USDT','')}</span>
+        <span class="coin-direction ${c.ha_direction.toLowerCase()}">${c.ha_direction}</span>
+      </div>
+      <div class="coin-price">${formatPrice(c.price)}</div>
+      <div class="coin-meta">ATR ${c.atr > 0 ? c.atr.toFixed(6) : '—'}</div>
+    </div>
+  `).join('');
+
+  // Slots grid
+  $('slotsGrid').innerHTML = d.slots.map(s => {
+    const stCls = s.state.toLowerCase().replace(' ', '_');
+    return `
+      <div class="slot-card ${s.state === 'IN_TRADE' ? 'in-trade' : ''}">
+        <div class="slot-header">
+          <span class="slot-id">SLOT #${s.id}</span>
+          <span class="slot-state ${stCls}">${s.state.replace('_', ' ')}</span>
+        </div>
+        <div class="slot-balance ${pnlClass(s.total_pnl)}">$${s.balance.toFixed(2)}</div>
+        <div class="slot-meta">
+          ${s.symbol ? s.symbol.replace('USDT','') + ' · ' : ''}
+          ${s.total_trades} trades · ${s.total_pnl >= 0 ? '+' : ''}$${s.total_pnl.toFixed(2)}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Active trades table
+  if (d.active_trades.length > 0) {
+    $('noTrades').style.display = 'none';
+    $('activeTrades').innerHTML = d.active_trades.map(t => `
+      <tr>
+        <td>${t.symbol.replace('USDT','')}</td>
+        <td><span class="${t.side === 'Buy' ? 'positive' : 'negative'}">${t.side === 'Buy' ? 'LONG' : 'SHORT'}</span></td>
+        <td>${formatPrice(t.entry_price)}</td>
+        <td>${formatPrice(t.current_price)}</td>
+        <td>${formatPrice(t.current_sl)}</td>
+        <td>TP${t.highest_tp}</td>
+        <td class="${pnlClass(t.unrealized_pnl)}">${formatPnl(t.unrealized_pnl)}</td>
+      </tr>
+    `).join('');
+  } else {
+    $('noTrades').style.display = 'block';
+    $('activeTrades').innerHTML = '';
+  }
+
+  // Signal log table
+  $('sigCount').textContent = d.signals.length;
+  if (d.signals.length > 0) {
+    $('noSignals').style.display = 'none';
+    $('signalLog').innerHTML = d.signals.map(s => `
+      <tr>
+        <td>${formatTime(s.time)}</td>
+        <td>${s.symbol.replace('USDT','')}</td>
+        <td><span class="${s.direction === 'LONG' ? 'positive' : 'negative'}">${s.direction}</span></td>
+        <td>${formatPrice(parseFloat(s.price))}</td>
+        <td>${actionBadge(s.action)}</td>
+      </tr>
+    `).join('');
+  } else {
+    $('noSignals').style.display = 'block';
+    $('signalLog').innerHTML = '';
+  }
+}
+
+// ─── Boot ───
+fetchDashboard();
+fetchLogs();
+setInterval(fetchDashboard, refreshInterval);
+setInterval(fetchLogs, logRefreshInterval);
+</script>
+</body>
+</html>

@@ -108,6 +108,58 @@
    docker logs -f bot
    ```
 
+## Go-Live Workflow (3 Stages)
+
+### Stage 1: DRY RUN (default)
+The bot starts in DRY_RUN=true mode. It connects to Bybit, fetches real market data, detects real HA flip signals, but places ZERO orders. You see everything in logs and Telegram.
+
+```bash
+# .env has DRY_RUN=true (default)
+docker logs -f bot
+```
+
+**What to watch for:**
+- `[BOOT] ✅ All systems go` — startup successful
+- `[HA] BTCUSDT: Built 200 HA candles` — history loaded
+- `[SIGNAL] ETHUSDT: Flip detected on 5M close! LONG` — signal fired
+- `[DRY RUN] 🔔 WOULD EXECUTE: LONG ETHUSDT` — would have traded
+- Telegram sends: `📋 DRY RUN SIGNAL` messages
+
+**Run for 24-48 hours minimum.** Compare signals with your TradingView chart.
+
+### Stage 2: GO LIVE
+Once satisfied signals match your TV indicator:
+
+```bash
+docker stop bot && docker rm bot
+nano .env  # Change DRY_RUN=false
+docker build -t eli-bot .
+docker run -d --restart=unless-stopped --name bot --env-file .env -v $(pwd)/data:/app/data eli-bot
+docker logs -f bot
+```
+
+Bot now places real orders. Telegram sends real trade entries/exits.
+
+### Stage 3: MONITOR
+```bash
+# Live logs
+docker logs -f bot
+
+# Check if running
+docker ps
+
+# Check SQLite trades
+docker exec -it bot python3 -c "
+import sqlite3
+conn = sqlite3.connect('data/bot.db')
+for row in conn.execute('SELECT id, symbol, side, status, pnl FROM trades ORDER BY id DESC LIMIT 10'):
+    print(row)
+"
+
+# Emergency stop
+docker stop bot
+```
+
 ## Option 2: Manual Setup (No Docker)
 
 1. **SSH into VM**.

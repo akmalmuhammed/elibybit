@@ -74,6 +74,11 @@ class SignalEngine:
         # Health tracking — updated on every WS message
         self.last_data_time: datetime = datetime.utcnow()
 
+        # Dashboard data caches
+        self._prices: Dict[str, Decimal] = {}          # symbol -> latest mark price
+        self._signal_log: List[Dict[str, Any]] = []    # last 50 signals for dashboard
+        self._start_time: datetime = datetime.utcnow()  # bot start time
+
     # ==================== WebSocket Handlers ====================
 
     async def on_kline_240(self, topic: str, data: Dict[str, Any]):
@@ -212,6 +217,7 @@ class SignalEngine:
             return
 
         mark_price = Decimal(str(mark_price_str))
+        self._prices[symbol] = mark_price  # Cache for dashboard
         await self.risk.check_price(symbol, mark_price)
 
     async def on_position_update(self, topic: str, data: Dict[str, Any]):
@@ -259,20 +265,34 @@ class SignalEngine:
             direction = "LONG" if side == Side.LONG else "SHORT"
             logger.info(f"[SIGNAL] Processing {direction} signal for {symbol}")
 
+            # Log signal for dashboard
+            self._signal_log.append({
+                "time": datetime.utcnow().isoformat(),
+                "symbol": symbol,
+                "direction": direction,
+                "price": str(self._prices.get(symbol, "0")),
+                "action": "PENDING",
+            })
+            if len(self._signal_log) > 50:
+                self._signal_log = self._signal_log[-50:]
+
             # Check 1: Is this asset in cooldown?
             if self._is_in_cooldown(symbol):
                 logger.info(f"[SIGNAL] {symbol}: In cooldown. Ignoring signal.")
+                self._signal_log[-1]["action"] = "SKIPPED_COOLDOWN"
                 return
 
             # Check 2: Is this asset already in an active trade?
             if self.coins.is_in_trade(symbol):
                 logger.info(f"[SIGNAL] {symbol}: Already in active trade. Ignoring signal.")
+                self._signal_log[-1]["action"] = "SKIPPED_IN_TRADE"
                 return
 
             # Check 3: Is there an available slot?
             slot = self.slots.get_available_slot()
             if slot is None:
                 logger.info(f"[SIGNAL] {symbol}: No available slots. Ignoring signal.")
+                self._signal_log[-1]["action"] = "SKIPPED_NO_SLOT"
                 return
 
             # Get coin info
@@ -286,6 +306,8 @@ class SignalEngine:
 
             # ═══ DRY RUN MODE ═══
             if self.config.execution.dry_run:
+                self._signal_log[-1]["action"] = "DRY_RUN"
+                self._signal_log[-1]["slot"] = slot.id
                 logger.info(
                     f"[DRY RUN] 🔔 WOULD EXECUTE: {direction} {symbol} on Slot #{slot.id}. "
                     f"Size: ${position_size:.2f} (${slot.balance:.2f} × {self.config.slots.leverage}x)"
@@ -303,6 +325,8 @@ class SignalEngine:
                 return
 
             # ═══ LIVE TRADING ═══
+            self._signal_log[-1]["action"] = "EXECUTED"
+            self._signal_log[-1]["slot"] = slot.id
             logger.info(
                 f"[SIGNAL] {symbol}: Executing {direction} on Slot #{slot.id}. "
                 f"Size: ${position_size:.2f} (${slot.balance:.2f} × {self.config.slots.leverage}x)"

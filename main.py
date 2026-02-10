@@ -49,6 +49,7 @@ from trading.risk_manager import RiskManager
 from trading.kill_switch import KillSwitch
 from storage.database import Database
 from notifications.telegram import TelegramNotifier
+from dashboard import Dashboard
 
 
 class Bot:
@@ -119,6 +120,9 @@ class Bot:
             api_secret=config.exchange.api_secret,
         )
 
+        # Dashboard web server
+        self.dashboard = Dashboard(self, port=int(os.getenv("DASHBOARD_PORT", "8080")))
+
     async def start(self):
         """Full startup sequence."""
         logger.info("=" * 60)
@@ -187,6 +191,9 @@ class Bot:
         # 10. Run all async tasks
         self._running = True
         logger.info("[BOOT] ✅ All systems go. Running...")
+
+        # Start dashboard web server
+        await self.dashboard.start()
 
         await asyncio.gather(
             self.ws.start(),
