@@ -13,7 +13,17 @@ from datetime import datetime
 from typing import List
 import logging
 
-# Configure logging before imports
+# Load .env file before anything else
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, rely on real env vars
+
+# Create data dir before FileHandler
+os.makedirs("data", exist_ok=True)
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-7s | %(message)s",

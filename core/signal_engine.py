@@ -63,7 +63,6 @@ class SignalEngine:
         # Option A flip tracking: symbol -> candle_start timestamp
         # Only allow ONE flip signal per 4H window per symbol
         self._flip_acted_this_window: Dict[str, int] = {}
-        self._current_window_start: Dict[str, int] = {}
 
         # Live 4H candle cache: symbol -> latest live Candle from kline.240
         # Updated every ~1-2s by WebSocket, but only READ on 5M candle close
@@ -402,6 +401,7 @@ class SignalEngine:
         """Wait for cooldown period then release the slot."""
         await asyncio.sleep(minutes * 60)
         slot = self.slots.get_slot(slot_id)
-        if slot and slot.state == SlotState.COOLDOWN:
+        if slot:
             from exchange.models import SlotState
-            self.slots.release_from_cooldown(slot)
+            if slot.state == SlotState.COOLDOWN:
+                self.slots.release_from_cooldown(slot)
