@@ -33,6 +33,7 @@ class ExecutionConfig:
     cooldown_minutes: int = 30          # Per-asset cooldown
     post_only_retries: int = 2          # Tier 1 & 2 are PostOnly
     # Tier 3 uses regular limit (may pay taker fee)
+    dry_run: bool = True                # Paper mode — log signals, no real orders
 
 
 @dataclass
@@ -112,4 +113,5 @@ class BotConfig:
         config.notifications.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
         config.storage.db_path = os.getenv("DB_PATH", "./data/bot.db")
         config.log_level = os.getenv("LOG_LEVEL", "INFO")
+        config.execution.dry_run = os.getenv("DRY_RUN", "true").lower() == "true"
         return config

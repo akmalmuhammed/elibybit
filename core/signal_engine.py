@@ -71,6 +71,9 @@ class SignalEngine:
         # Lock to prevent concurrent signal processing
         self._signal_lock = asyncio.Lock()
 
+        # Health tracking — updated on every WS message
+        self.last_data_time: datetime = datetime.utcnow()
+
     # ==================== WebSocket Handlers ====================
 
     async def on_kline_240(self, topic: str, data: Dict[str, Any]):
@@ -80,6 +83,7 @@ class SignalEngine:
         - confirm: false → Cache the live 4H candle (do NOT check for flip here)
         - confirm: true  → Store in HA chain, reset flip tracking for new window
         """
+        self.last_data_time = datetime.utcnow()
         kline_data = data.get("data", [])
         if not kline_data:
             return
@@ -280,6 +284,25 @@ class SignalEngine:
             # Calculate position size
             position_size = self.slots.calculate_position_size(slot)
 
+            # ═══ DRY RUN MODE ═══
+            if self.config.execution.dry_run:
+                logger.info(
+                    f"[DRY RUN] 🔔 WOULD EXECUTE: {direction} {symbol} on Slot #{slot.id}. "
+                    f"Size: ${position_size:.2f} (${slot.balance:.2f} × {self.config.slots.leverage}x)"
+                )
+                atr = self.atr.get_atr(symbol)
+                if atr:
+                    logger.info(f"[DRY RUN] ATR(14) = {atr:.6f} → TP spacing = {atr}")
+                await self.notifier.send(
+                    f"📋 <b>DRY RUN SIGNAL</b>\n\n"
+                    f"{'🟢 LONG' if side == Side.LONG else '🔴 SHORT'} <code>{symbol}</code>\n"
+                    f"Slot #{slot.id} (${slot.balance:.2f})\n"
+                    f"Size: ${position_size:.2f}\n"
+                    f"ATR: {atr or 'N/A'}"
+                )
+                return
+
+            # ═══ LIVE TRADING ═══
             logger.info(
                 f"[SIGNAL] {symbol}: Executing {direction} on Slot #{slot.id}. "
                 f"Size: ${position_size:.2f} (${slot.balance:.2f} × {self.config.slots.leverage}x)"

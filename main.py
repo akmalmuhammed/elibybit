@@ -144,6 +144,10 @@ class Bot:
         # 4. Recover any open trades from DB
         self.risk_manager.load_active_trades()
 
+        # 4b. Reconcile DB state with actual Bybit positions
+        if not self.config.execution.dry_run:
+            await self._reconcile_positions()
+
         # 5. Select top 20 coins
         logger.info("[BOOT] Fetching top coins by volume...")
         added, removed = await self.coin_selector.refresh(self.client)
@@ -164,13 +168,21 @@ class Bot:
         await self.ws.subscribe_symbols(self.coin_selector.symbols)
 
         # 9. Send startup notification
+        mode = "🔍 DRY RUN (observe only)" if self.config.execution.dry_run else "🔴 LIVE TRADING"
         await self.notifier.send_bot_status(
             f"Started ✅\n"
+            f"Mode: {mode}\n"
             f"Coins: {len(self.coin_selector.symbols)}\n"
             f"Slots: {self.slot_manager.count_available()} available, "
             f"{self.slot_manager.count_in_trade()} in trade\n"
             f"Total balance: ${self.slot_manager.get_total_balance():.2f}"
         )
+
+        if self.config.execution.dry_run:
+            logger.info("=" * 60)
+            logger.info("   🔍 DRY RUN MODE — NO REAL ORDERS WILL BE PLACED")
+            logger.info("   Set DRY_RUN=false in .env to enable live trading")
+            logger.info("=" * 60)
 
         # 10. Run all async tasks
         self._running = True
@@ -181,6 +193,7 @@ class Bot:
             self.kill_switch.start(),
             self._coin_refresh_loop(),
             self._daily_summary_loop(),
+            self._health_check_loop(),
         )
 
     async def stop(self):
@@ -326,6 +339,110 @@ class Bot:
                 await self.notifier.send_daily_summary(summary)
             except Exception as e:
                 logger.error(f"[DAILY] Summary error: {e}")
+
+    async def _health_check_loop(self):
+        """
+        Periodic health check — monitors:
+        - WebSocket connection alive
+        - Last data received timestamp
+        Sends alert if anything is wrong.
+        """
+        check_interval = 300  # Every 5 minutes
+        stale_threshold = 120  # Alert if no WS data for 2 minutes
+
+        while self._running:
+            await asyncio.sleep(check_interval)
+            if not self._running:
+                break
+
+            try:
+                now = datetime.utcnow()
+                issues = []
+
+                # Check WebSocket connectivity
+                if self.ws._public_ws is None:
+                    issues.append("Public WebSocket disconnected")
+                if self.ws._private_ws is None and not self.config.execution.dry_run:
+                    issues.append("Private WebSocket disconnected")
+
+                # Check data freshness via signal engine
+                seconds_since_data = (now - self.signal_engine.last_data_time).total_seconds()
+                if seconds_since_data > stale_threshold:
+                    issues.append(f"No WS data received for {int(seconds_since_data)}s")
+
+                if issues:
+                    msg = "⚠️ <b>HEALTH CHECK ALERT</b>\n\n" + "\n".join(f"• {i}" for i in issues)
+                    logger.warning(f"[HEALTH] Issues: {issues}")
+                    await self.notifier.send(msg)
+                else:
+                    logger.debug("[HEALTH] All systems OK")
+
+            except Exception as e:
+                logger.error(f"[HEALTH] Check error: {e}")
+
+    async def _reconcile_positions(self):
+        """
+        On startup, compare DB trades with actual Bybit positions.
+        Close any orphaned positions, update any stale trade records.
+        """
+        logger.info("[RECONCILE] Checking Bybit positions vs DB state...")
+
+        try:
+            positions = await self.client.get_positions()
+            active_trades = self.risk_manager.get_all_active_trades()
+
+            # Build sets for comparison
+            bybit_symbols = set()
+            for pos in positions:
+                size = Decimal(pos.get("size", "0"))
+                if size > 0:
+                    bybit_symbols.add(pos["symbol"])
+
+            db_symbols = set(t.symbol for t in active_trades)
+
+            # Positions on Bybit but NOT in DB — orphaned, close them
+            orphaned = bybit_symbols - db_symbols
+            for symbol in orphaned:
+                logger.warning(f"[RECONCILE] ORPHAN found: {symbol} has position on Bybit but no DB trade")
+                for pos in positions:
+                    if pos["symbol"] == symbol and Decimal(pos.get("size", "0")) > 0:
+                        logger.warning(f"[RECONCILE] Closing orphaned {symbol} position at market")
+                        await self.client.close_position_market(
+                            symbol=symbol,
+                            side=pos["side"],
+                            qty=pos["size"],
+                        )
+                        await self.notifier.send(
+                            f"⚠️ <b>ORPHAN CLOSED</b>\n{symbol} position found on Bybit "
+                            f"with no matching DB trade. Closed at market."
+                        )
+
+            # Trades in DB but NOT on Bybit — position was closed while bot was down
+            stale = db_symbols - bybit_symbols
+            for symbol in stale:
+                trade = self.risk_manager.get_active_trade_by_symbol(symbol)
+                if trade:
+                    logger.warning(
+                        f"[RECONCILE] STALE trade: {symbol} in DB but no Bybit position. "
+                        f"Marking as closed."
+                    )
+                    from exchange.models import ExitReason
+                    self.risk_manager.handle_trade_closed(
+                        trade, ExitReason.SL_HIT, Decimal("0"), Decimal("0")
+                    )
+                    slot = self.slot_manager.get_slot(trade.slot_id)
+                    if slot:
+                        self.slot_manager.release_slot(slot)
+
+            matched = bybit_symbols & db_symbols
+            logger.info(
+                f"[RECONCILE] Done. Matched: {len(matched)}, "
+                f"Orphaned (closed): {len(orphaned)}, Stale (cleaned): {len(stale)}"
+            )
+
+        except Exception as e:
+            logger.error(f"[RECONCILE] Error: {e}", exc_info=True)
+            await self.notifier.send(f"⚠️ Position reconciliation failed: {e}")
 
 
 async def main():
