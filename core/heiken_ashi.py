@@ -140,6 +140,22 @@ class HeikenAshiEngine:
             )
         return None
 
+    def calc_live(self, symbol: str, candle: Candle) -> Tuple[Optional[HACandle], Optional[Signal]]:
+        """
+        Calculate HA from a LIVE (unconfirmed) 4H candle.
+        Does NOT modify the stored series — read-only check.
+        Used to detect flips mid-4H-window (matches TV lookahead_on behavior).
+
+        Returns (live_ha_candle, signal_if_flip).
+        """
+        prev_ha = self._prev_ha.get(symbol)
+        if prev_ha is None:
+            return None, None
+
+        live_ha = self._calc_single(candle, prev_ha)
+        signal = self._detect_flip(symbol, prev_ha, live_ha)
+        return live_ha, signal
+
     def remove_symbol(self, symbol: str):
         """Remove a symbol (e.g., when it drops out of top 20)."""
         self._ha_series.pop(symbol, None)

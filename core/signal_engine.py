@@ -60,46 +60,114 @@ class SignalEngine:
         # Per-asset cooldown tracking: symbol -> cooldown_until
         self._cooldowns: Dict[str, datetime] = {}
 
+        # Option A flip tracking: symbol -> candle_start timestamp
+        # Only allow ONE flip signal per 4H window per symbol
+        self._flip_acted_this_window: Dict[str, int] = {}
+        self._current_window_start: Dict[str, int] = {}
+
+        # Live 4H candle cache: symbol -> latest live Candle from kline.240
+        # Updated every ~1-2s by WebSocket, but only READ on 5M candle close
+        self._live_4h_candle: Dict[str, Candle] = {}
+
         # Lock to prevent concurrent signal processing
         self._signal_lock = asyncio.Lock()
 
     # ==================== WebSocket Handlers ====================
 
     async def on_kline_240(self, topic: str, data: Dict[str, Any]):
-        """Handle 4H kline WebSocket message."""
+        """
+        Handle 4H kline WebSocket message.
+
+        - confirm: false → Cache the live 4H candle (do NOT check for flip here)
+        - confirm: true  → Store in HA chain, reset flip tracking for new window
+        """
         kline_data = data.get("data", [])
         if not kline_data:
             return
 
         for kline in kline_data:
-            # Only process confirmed (closed) candles
-            if not kline.get("confirm", False):
-                continue
-
             symbol = kline.get("symbol", "")
             if not symbol:
-                # Extract from topic: "kline.240.BTCUSDT" → "BTCUSDT"
                 parts = topic.split(".")
                 if len(parts) >= 3:
                     symbol = parts[2]
 
+            confirmed = kline.get("confirm", False)
+            candle_start = int(kline.get("start", 0))
+
             candle = Candle(
-                timestamp=int(kline.get("start", 0)),
+                timestamp=candle_start,
                 open=Decimal(str(kline.get("open", 0))),
                 high=Decimal(str(kline.get("high", 0))),
                 low=Decimal(str(kline.get("low", 0))),
                 close=Decimal(str(kline.get("close", 0))),
                 volume=Decimal(str(kline.get("volume", 0))),
-                confirmed=True,
+                confirmed=confirmed,
             )
 
-            logger.info(f"[SIGNAL] {symbol}: 4H candle confirmed. C={candle.close}")
+            if confirmed:
+                # ═══ 4H CANDLE CLOSED ═══
+                # Store in HA chain (becomes the new "previous" for next window)
+                logger.info(f"[SIGNAL] {symbol}: 4H candle CONFIRMED. C={candle.close}")
+                self.ha.update(symbol, candle)
 
-            # Update HA and check for flip
-            ha_candle, signal = self.ha.update(symbol, candle)
+                # Reset flip tracking — new 4H window starts
+                self._flip_acted_this_window.pop(symbol, None)
+                self._live_4h_candle.pop(symbol, None)
+            else:
+                # ═══ LIVE 4H UPDATE ═══
+                # Just cache it. The 5M handler will read it.
+                self._live_4h_candle[symbol] = candle
 
-            if signal:
-                await self._process_signal(signal)
+    async def on_kline_5(self, topic: str, data: Dict[str, Any]):
+        """
+        Handle 5M kline WebSocket message.
+        This is the TRIGGER for HA flip checks — matches TV indicator behavior.
+
+        On every confirmed 5M candle close:
+          1. Read the cached live 4H candle for this symbol
+          2. Calculate HA (read-only, no storage)
+          3. Check for flip against last confirmed HA
+          4. Option A: only act on first flip per 4H window
+        """
+        kline_data = data.get("data", [])
+        if not kline_data:
+            return
+
+        for kline in kline_data:
+            # Only trigger on confirmed 5M candle close
+            if not kline.get("confirm", False):
+                continue
+
+            symbol = kline.get("symbol", "")
+            if not symbol:
+                parts = topic.split(".")
+                if len(parts) >= 3:
+                    symbol = parts[2]
+
+            # Read the cached live 4H candle
+            live_4h = self._live_4h_candle.get(symbol)
+            if live_4h is None:
+                continue
+
+            # Calculate HA without modifying stored series
+            live_ha, signal = self.ha.calc_live(symbol, live_4h)
+
+            if signal is None:
+                continue
+
+            # Option A: Only act on FIRST flip per 4H window
+            candle_start = live_4h.timestamp
+            if self._flip_acted_this_window.get(symbol) == candle_start:
+                continue
+
+            # New flip detected at this 5M candle close!
+            self._flip_acted_this_window[symbol] = candle_start
+            logger.info(
+                f"[SIGNAL] {symbol}: Flip detected on 5M close! "
+                f"{'LONG' if signal.side == Side.LONG else 'SHORT'}"
+            )
+            await self._process_signal(signal)
 
     async def on_kline_15(self, topic: str, data: Dict[str, Any]):
         """Handle 15M kline WebSocket message — update ATR."""

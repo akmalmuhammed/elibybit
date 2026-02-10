@@ -12,10 +12,6 @@ from decimal import Decimal
 from datetime import datetime
 from typing import List
 import logging
-from dotenv import load_dotenv
-
-# Load env vars before config
-load_dotenv()
 
 # Configure logging before imports
 logging.basicConfig(
@@ -148,6 +144,7 @@ class Bot:
 
         # 7. Register WebSocket handlers
         self.ws.on("kline.240", self.signal_engine.on_kline_240)
+        self.ws.on("kline.5", self.signal_engine.on_kline_5)
         self.ws.on("kline.15", self.signal_engine.on_kline_15)
         self.ws.on("tickers", self.signal_engine.on_ticker)
         self.ws.on("position", self.signal_engine.on_position_update)
@@ -341,9 +338,6 @@ async def main():
 
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, lambda s=sig: handle_signal(s))
-    else:
-        # Windows handling relying on KeyboardInterrupt catch below
-        pass
 
     try:
         await bot.start()

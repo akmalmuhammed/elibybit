@@ -49,7 +49,7 @@ class CoinConfig:
         "USDCUSDT", "DAIUSDT", "TUSDUSDT", "BUSDUSDT", "FDUSDUSDT",
     ])
     coin_refresh_interval_hours: int = 4
-    ha_history_candles: int = 50        # Candles to fetch on startup
+    ha_history_candles: int = 200        # Candles to fetch on startup
 
 
 @dataclass
@@ -105,9 +105,9 @@ class BotConfig:
     def from_env(cls) -> "BotConfig":
         """Load config with environment variable overrides."""
         config = cls()
-        config.exchange.api_key = os.getenv("BYBIT_API_KEY", "").strip()
-        config.exchange.api_secret = os.getenv("BYBIT_API_SECRET", "").strip()
-        config.exchange.testnet = os.getenv("BYBIT_TESTNET", "false").lower().strip() == "true"
+        config.exchange.api_key = os.getenv("BYBIT_API_KEY", "")
+        config.exchange.api_secret = os.getenv("BYBIT_API_SECRET", "")
+        config.exchange.testnet = os.getenv("BYBIT_TESTNET", "false").lower() == "true"
         config.notifications.telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         config.notifications.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
         config.storage.db_path = os.getenv("DB_PATH", "./data/bot.db")

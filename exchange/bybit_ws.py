@@ -102,7 +102,8 @@ class BybitWSManager:
         topics = []
         for symbol in symbols:
             topics.extend([
-                f"kline.240.{symbol}",   # 4H candles for HA
+                f"kline.240.{symbol}",   # 4H candles for HA (live + confirmed)
+                f"kline.5.{symbol}",     # 5M candles — trigger HA check on close
                 f"kline.15.{symbol}",    # 15M candles for ATR
                 f"tickers.{symbol}",     # Price updates for TP monitoring
             ])
@@ -114,6 +115,7 @@ class BybitWSManager:
         for symbol in symbols:
             topics.extend([
                 f"kline.240.{symbol}",
+                f"kline.5.{symbol}",
                 f"kline.15.{symbol}",
                 f"tickers.{symbol}",
             ])
