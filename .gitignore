@@ -1,0 +1,19 @@
+# Environment variables (Sensitive!)
+.env
+.venv
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database and Logs
+data/*.db
+data/*.log
+*.log
+
+# IDEs
+.vscode/
+.idea/
